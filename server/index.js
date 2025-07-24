@@ -4,46 +4,51 @@ const bodyParser = require('body-parser');
 const { BskyAgent } = require('@atproto/api');
 
 const app = express();
+const port = process.env.PORT || 10000;
+
 app.use(cors());
 app.use(bodyParser.json());
 
-const PORT = process.env.PORT || 5000;
+function clean(input) {
+  return typeof input === 'string' ? input.trim().replace(/[\u200B-\u200D\uFEFF]/g, '') : input;
+}
 
 app.post('/follow-all', async (req, res) => {
-  const { identifier, appPassword, targetHandle } = req.body;
+  const identifier = clean(req.body.identifier);
+  const appPassword = clean(req.body.appPassword);
+  const targetHandle = clean(req.body.targetHandle);
 
   console.log('🔍 Received login request:');
   console.log('Identifier:', identifier);
-  console.log('Password starts with:', appPassword?.slice(0, 4), '... (hidden)');
+  console.log('Password:', appPassword);
   console.log('Target handle:', targetHandle);
 
-  if (!identifier || !appPassword || !targetHandle) {
-    console.log('❌ Missing required fields');
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
+  const agent = new BskyAgent({ service: 'https://bsky.social' });
 
   try {
-    const agent = new BskyAgent({ service: 'https://bsky.social' });
     await agent.login({ identifier, password: appPassword });
 
-    const targetProfile = await agent.getProfile({ actor: targetHandle });
-    const followers = await agent.getFollowers({ actor: targetProfile.data.did });
+    const profile = await agent.getProfile({ actor: targetHandle });
+    const targetDid = profile.data.did;
+
+    const followers = await agent.getFollowers({ actor: targetDid, limit: 100 });
 
     for (const follower of followers.data.followers) {
       try {
         await agent.follow(follower.did);
+        console.log(`✅ Followed ${follower.handle}`);
       } catch (err) {
-        console.error(`Failed to follow ${follower.handle}`);
+        console.error(`⚠️ Failed to follow ${follower.handle}:`, err.message);
       }
     }
 
-    res.json({ success: true, followedCount: followers.data.followers.length });
+    res.json({ success: true, followed: followers.data.followers.length });
   } catch (err) {
     console.error('❌ Login or fetch failed:', err);
-    res.status(500).json({ error: 'Something went wrong' });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+app.listen(port, () => {
+  console.log(`🚀 Server running on port ${port}`);
 });
