@@ -12,7 +12,13 @@ const PORT = process.env.PORT || 5000;
 app.post('/follow-all', async (req, res) => {
   const { identifier, appPassword, targetHandle } = req.body;
 
+  console.log('🔍 Received login request:');
+  console.log('Identifier:', identifier);
+  console.log('Password starts with:', appPassword?.slice(0, 4), '... (hidden)');
+  console.log('Target handle:', targetHandle);
+
   if (!identifier || !appPassword || !targetHandle) {
+    console.log('❌ Missing required fields');
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -33,11 +39,11 @@ app.post('/follow-all', async (req, res) => {
 
     res.json({ success: true, followedCount: followers.data.followers.length });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Login or fetch failed:', err);
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`✅ Server running on port ${PORT}`);
 });
